@@ -157,6 +157,19 @@ type PDH_FMT_COUNTERVALUE_ITEM_LONG struct {
 	FmtValue PDH_FMT_COUNTERVALUE_LONG
 }
 
+type PDH_RAW_COUNTER struct {
+	CStatus     uint32
+	TimeStamp   uint64
+	FirstValue  uint64
+	SecondValue uint64
+	MultiCount  uint32
+}
+
+type PDH_RAW_COUNTER_ITEM struct {
+	SzName   *uint16 //pointer to a string
+	RawValue PDH_RAW_COUNTER
+}
+
 var (
 	// Library
 	libpdhDll *syscall.DLL
@@ -170,6 +183,8 @@ var (
 	pdh_GetFormattedCounterArrayW *syscall.Proc
 	pdh_OpenQuery                 *syscall.Proc
 	pdh_ValidatePathW             *syscall.Proc
+	pdh_GetRawCounterValue        *syscall.Proc
+	pdh_GetRawCounterArrayW       *syscall.Proc
 )
 
 func init() {
@@ -185,6 +200,8 @@ func init() {
 	pdh_GetFormattedCounterArrayW = libpdhDll.MustFindProc("PdhGetFormattedCounterArrayW")
 	pdh_OpenQuery = libpdhDll.MustFindProc("PdhOpenQuery")
 	pdh_ValidatePathW = libpdhDll.MustFindProc("PdhValidatePathW")
+	pdh_GetRawCounterValue = libpdhDll.MustFindProc("PdhGetRawCounterValue")
+	pdh_GetRawCounterArrayW = libpdhDll.MustFindProc("PdhGetRawCounterArrayW")
 }
 
 // Adds the specified counter to the query. This is the internationalized version. Preferably, use the
@@ -326,6 +343,34 @@ func PdhGetFormattedCounterValueLong(hCounter PDH_HCOUNTER, lpdwType *uint32, pV
 		uintptr(PDH_FMT_LONG),
 		uintptr(unsafe.Pointer(lpdwType)),
 		uintptr(unsafe.Pointer(pValue)))
+
+	return uint32(ret)
+}
+
+// Get the raw counter array from the byte buffer returned by PdhGetRawCounterArray
+func PdhConvertRawCounterArray(lpdwBufferCount uint32, itemBuffer []byte) []PDH_RAW_COUNTER_ITEM {
+	return (*[1 << 30]PDH_RAW_COUNTER_ITEM)(unsafe.Pointer(&itemBuffer[0]))[0:lpdwBufferCount:lpdwBufferCount]
+}
+
+// Returns the raw value of the given hCounter. Always returns a struct with one or two values stored as uint64.
+func PdhGetRawCounterValue(hCounter PDH_HCOUNTER, lpdwType *uint32, pValue *PDH_RAW_COUNTER) uint32 {
+	ret, _, _ := pdh_GetRawCounterValue.Call(
+		uintptr(hCounter),
+		uintptr(unsafe.Pointer(lpdwType)),
+		uintptr(unsafe.Pointer(pValue)))
+
+	return uint32(ret)
+}
+
+// Returns an array of raw values. Use this function when you want the raw counter values of a counter
+// that contains a wildcard character for the instance name. The itemBuffer must be a slice of type PDH_RAW_COUNTER_ITEM.
+// See PdhGetFormattedCounterArrayDouble for an example of how this can be used.
+func PdhGetRawCounterArray(hCounter PDH_HCOUNTER, lpdwBufferSize *uint32, lpdwBufferCount *uint32, itemBuffer *byte) uint32 {
+	ret, _, _ := pdh_GetRawCounterArrayW.Call(
+		uintptr(hCounter),
+		uintptr(unsafe.Pointer(lpdwBufferSize)),
+		uintptr(unsafe.Pointer(lpdwBufferCount)),
+		uintptr(unsafe.Pointer(itemBuffer)))
 
 	return uint32(ret)
 }

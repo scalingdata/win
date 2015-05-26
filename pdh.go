@@ -349,10 +349,12 @@ func PdhGetFormattedCounterValueLong(hCounter PDH_HCOUNTER, lpdwType *uint32, pV
 //		if ret == win.ERROR_SUCCESS {
 //			ret = win.PdhGetFormattedCounterArrayDouble(counterHandle, &bufSize, &bufCount, &emptyBuf[0]) // uses null ptr here according to MSDN.
 //			if ret == win.PDH_MORE_DATA {
-//				filledBuf := make([]win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE, bufCount*size)
+//				// Make sure we're allocating the requested amount of space
+//				filledBuf := make([]byte, bufSize)
 //				ret = win.PdhGetFormattedCounterArrayDouble(counterHandle, &bufSize, &bufCount, &filledBuf[0])
 //				for i := 0; i < int(bufCount); i++ {
-//					c := filledBuf[i]
+//					// Do some pointer arithmetic to access the elements of the array
+//					c := *(*win.PDH_FMT_COUNTERVALUE_ITEM_DOUBLE)(unsafe.Pointer(uintptr(unsafe.Pointer(&filledBuf[0])) + uintptr(i) * structSize))
 //					var s string = win.UTF16PtrToString(c.SzName)
 //					fmt.Printf("Index %d -> %s, value %v\n", i, s, c.FmtValue.DoubleValue)
 //				}

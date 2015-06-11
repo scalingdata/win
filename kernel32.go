@@ -57,6 +57,7 @@ var (
 	// Functions
 	closeHandle            uintptr
 	fileTimeToSystemTime   uintptr
+	formatMessage          uintptr
 	getLastError           uintptr
 	getLocaleInfo          uintptr
 	getLogicalDriveStrings uintptr
@@ -116,6 +117,7 @@ func init() {
 	// Functions
 	closeHandle = MustGetProcAddress(libkernel32, "CloseHandle")
 	fileTimeToSystemTime = MustGetProcAddress(libkernel32, "FileTimeToSystemTime")
+	formatMessage = MustGetProcAddress(libkernel32, "FormatMessageW")
 	getLastError = MustGetProcAddress(libkernel32, "GetLastError")
 	getLocaleInfo = MustGetProcAddress(libkernel32, "GetLocaleInfoW")
 	getLogicalDriveStrings = MustGetProcAddress(libkernel32, "GetLogicalDriveStringsW")
@@ -298,4 +300,23 @@ func SystemTimeToFileTime(lpSystemTime *SYSTEMTIME, lpFileTime *FILETIME) bool {
 		0)
 
 	return ret != 0
+}
+
+// This will get added to x/sys/windows at some point, but we need it now
+// See https://github.com/golang/go/issues/11147
+func FormatMessage(flags uint32, msgsrc uintptr, msgid uint32, langid uint32, buf []uint16, args *byte) (n uint32, err error) {
+	var _p0 *uint16
+	if len(buf) > 0 {
+		_p0 = &buf[0]
+	}
+	r0, _, e1 := syscall.Syscall9(formatMessage, 7, uintptr(flags), uintptr(msgsrc), uintptr(msgid), uintptr(langid), uintptr(unsafe.Pointer(_p0)), uintptr(len(buf)), uintptr(unsafe.Pointer(args)), 0, 0)
+	n = uint32(r0)
+	if n == 0 {
+		if e1 != 0 {
+			err = error(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
 }

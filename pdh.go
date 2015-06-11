@@ -5,7 +5,9 @@
 package win
 
 import (
+	"errors"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -478,4 +480,21 @@ func PdhValidatePath(path string) uint32 {
 	ret, _, _ := pdh_ValidatePathW.Call(uintptr(unsafe.Pointer(ptxt)))
 
 	return uint32(ret)
+}
+
+// Get the PDH error string for a given error code
+func PdhFormatError(errno uint32) error {
+	var flags uint32 = syscall.FORMAT_MESSAGE_ARGUMENT_ARRAY | syscall.FORMAT_MESSAGE_IGNORE_INSERTS | syscall.FORMAT_MESSAGE_FROM_HMODULE | syscall.FORMAT_MESSAGE_FROM_SYSTEM
+
+	b := make([]uint16, 300)
+	l, err := FormatMessage(flags, uintptr(libpdhDll.Handle), errno, 0, b, nil)
+	if err != nil {
+		return err
+	}
+	for ; l > 0; l-- {
+		if b[l] == '\n' && b[l-1] == '\r' {
+			break
+		}
+	}
+	return errors.New(string(utf16.Decode(b[:l-1])))
 }
